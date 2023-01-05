@@ -6,3 +6,7 @@ Given a dynamic weight matrix and a network, the notebook computes the principal
 
 # RMT.ipynb
 Given a network with already computed principal components, the notebook computes the singular values, plots a histogram of them and gives a colorplot for the principal componentes to the singular values.
+
+# dynamic_weight_matrix.ipynb
+Given a network, the notebook computes the dynamic weight matrix of a chosen layer, which is needed in order to cpmpute.
+
