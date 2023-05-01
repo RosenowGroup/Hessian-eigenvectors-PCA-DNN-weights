@@ -15,3 +15,6 @@ Definition and training of a simple 3 layer network with L2-regularization.
 
 ## pca_analysis
 Given a principal component basis and a network, the notebook computes the trainaccuracy and loss aswell as the test accuracy when adding these components together.
+
+## lanczos.py
+Given a TensorFlow network, computes a chosen number of eigenvalues and eigenvectors of the Hessian matrix of the loss.
