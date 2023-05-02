@@ -69,11 +69,11 @@ for layer in layer_name:
 
 
 @tf.function
-def hessian_calc(images, labels, vector):
+def hessian_calc(vector):
     with tf.GradientTape() as tape1:
         with tf.GradientTape() as tape2:
-            predictions = model(images, training=True)
-            loss = loss_object(labels, predictions)
+            predictions = model(x_train, training=True)
+            loss = loss_object(y_train, predictions)
             # term to include regularization
             loss += sum(model.losses)
         gradient = tape2.gradient(loss, layer_name)
@@ -131,7 +131,7 @@ def lanczos(vector: tf.Tensor, m: int):
     # vectors of the lanczos alogrithm
     V = []
     vector_norm = vector/tf.linalg.norm(vector)
-    w = flatten(hessian_calc(x_train, y_train, repack(vector_norm)))
+    w = flatten(hessian_calc(repack(vector_norm)))
     a = tf.tensordot(w, vector_norm, axes=1)
     w = w-a*vector_norm
     alpha.append(a)
@@ -142,7 +142,7 @@ def lanczos(vector: tf.Tensor, m: int):
         vector_norm = w/b
         if b == 0:
             vector_norm = get_orth(V)
-        w = flatten(hessian_calc(x_train, y_train, repack(vector_norm)))
+        w = flatten(hessian_calc(repack(vector_norm)))
         a = tf.tensordot(w, vector_norm, axes=1)
         w = w-a*vector_norm-b*V[-1]
         alpha.append(a)
