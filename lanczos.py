@@ -51,7 +51,7 @@ model.load_weights(model_str+'/saved_model/'+model_str)
 # list of layers from which we want to compute the eigenvectors
 layer_name = []
 for layer in model.trainable_weights:
-    if len(layer.shape) == 2:
+    if len(layer.shape) > 1:
         layer_name.append(layer)
 # computes the number of parameters of the layer
 layer_size = 0
@@ -67,7 +67,7 @@ layer_lengths = []
 for layer in layer_name:
     layer_lengths.append(tf.math.reduce_prod(layer.shape))
 
-
+# computes the hessians vector product H*vector for all images at once, can be ditributed to batech to reduce memory consumption
 @tf.function
 def hessian_calc(vector):
     with tf.GradientTape() as tape1:
@@ -82,7 +82,7 @@ def hessian_calc(vector):
 
 loss_object = tf.keras.losses.SparseCategoricalCrossentropy()
 
-
+# reshapes the vector to a list to match tensorflow criteria
 @tf.function
 def repack(weights):
 
@@ -95,7 +95,7 @@ def repack(weights):
         templer.append(templ)
     return templer
 
-
+# flattens tensorflow lists to vectors
 @tf.function
 def flatten(grad):
     temp = tf.TensorArray(tf.float32, size=0,
@@ -108,17 +108,12 @@ def flatten(grad):
 # draw orthonormal vector for lanczos
 
 
-@tf.function
-def get_orth(V):
-    rand = g.normal(shape=V[0].shape)
-    ortho = rand*1
-    for vector in V:
-        ortho -= tf.tensordot(rand, vector, axes=1)*vector
-    temp = tf.linalg.norm(ortho)
-    # ensures we never get a zero vector (unstable)
-    if temp == 0:
-        return get_orth(V)
-    return ortho/temp
+# draw orthonormal vector for lanczos, RAM inefficient but neccesary
+def get_orth(vec,V):
+  ortho = vec-np.tensordot(np.tensordot(vec,V,axes=[0,1]),V,axes=[0,0])
+  temp = tf.linalg.norm(ortho)
+  return ortho/temp
+
 
 
 def lanczos(vector: tf.Tensor, m: int):
@@ -135,19 +130,20 @@ def lanczos(vector: tf.Tensor, m: int):
     a = tf.tensordot(w, vector_norm, axes=1)
     w = w-a*vector_norm
     alpha.append(a)
-    V.append(vector_norm)
+    # add np array to list to limit GPU memory use
+    V.append(np.array(vector_norm))
     for i in tf.range(m-1):
         print(str(int(i))+' of '+str(m-2))
         b = tf.linalg.norm(w)
-        vector_norm = w/b
-        if b == 0:
-            vector_norm = get_orth(V)
+        # for better numerically stability
+        w /= b
+        vector_norm = get_orth(w,V)
         w = flatten(hessian_calc(repack(vector_norm)))
         a = tf.tensordot(w, vector_norm, axes=1)
         w = w-a*vector_norm-b*V[-1]
         alpha.append(a)
         beta.append(b)
-        V.append(vector_norm)
+        V.append(np.array(vector_norm))
         time_temp = time.monotonic()
         time_diff = time_temp - time_stemp
         time_stemp = time_temp
