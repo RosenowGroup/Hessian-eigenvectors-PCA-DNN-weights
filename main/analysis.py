@@ -90,7 +90,8 @@ def evh_weights_prod(
         evh = load_evh(model_str, layer_str)
     else:
         ewh, evh = hess.comp_eig(
-            model, layer_str, x_train, y_train, batch_size=batch_size, tens=tens)
+            model, layer_str, x_train, y_train,
+            batch_size=batch_size, tens=tens)
     return weights_prod(weights, evh)
 
 
@@ -100,7 +101,7 @@ def evh_weights_max(model, evh, layer_str):
     return np.argmax(np.abs(weights_prod(weights, evh)))
 
 
-def sv_field(model, model_str, layer_str):
+def sv_field(model, model_str, layer_str, md_str="evh"):
     model = load_weights(model, model_str)
     layer_pointer = get_layer_pointer(model, layer_str)[0]
     if len(layer_pointer.shape) > 2:
@@ -108,7 +109,10 @@ def sv_field(model, model_str, layer_str):
     else:
         matrix = layer_pointer
     svv = svd(matrix)
-    evh = load_evh(model_str, layer_str)
+    if md_str == "evh":
+        evh = load_evh(model_str, layer_str)
+    else:
+        evh = np.load(model_str+'/'+md_str+'_'+layer_str+'.npy')
     return np.tensordot(svv, evh, axes=(1, 1))
 
 
@@ -144,7 +148,6 @@ def acc_components(
         (x_train, y_train)).batch(batch_size)
 
     weights_0 = flatten(layer_name)
-
 
     theta = np.tensordot(weights_0, vecs, axes=(0, 1))
     if layer_str == "all":
