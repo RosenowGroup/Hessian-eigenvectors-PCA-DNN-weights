@@ -10,7 +10,7 @@ def hess(model, layer_str, x_train, y_train, batch_size=1000):
     Computes the Hessian matrix of a tensorflow model.
 
     Args:
-      model: compiled model.
+      model: model.
       layer_str: str of a layer, i.e. "layers[2]" for layer 3,
         or "all" for all layers.
       x_train: training samples.
@@ -99,6 +99,19 @@ def hess(model, layer_str, x_train, y_train, batch_size=1000):
 
 
 def eigh(hess, tens=True):
+    """
+    Computes the eigenvalues and eigenvectors
+      of the Hessian or a hermitian matrix in general.
+
+    Args:
+      hess: Hessian matrix or matrix.
+      tens: bool that determines, if the eigensolver
+        of numpy or tensorflow should be used
+        defaults to True, the tensorflow eigensolver.
+
+    Returns:
+      eigenvalues [i], eigenvectors [i,:] in decreasing order as numpy arrays.
+    """
     if tens:
         eigh, vech = tf.linalg.eigh(hess)
     else:
@@ -107,10 +120,43 @@ def eigh(hess, tens=True):
 
 
 def comp_eig(model, layer_str, x_train, y_train, batch_size=1000, tens=True):
+    """
+    Computes the eigenvalues and eigenvectors of model directly.
+
+    Args:
+        model: model.
+        layer_str: str of a layer, i.e. "layers[2]" for layer 3,
+          or "all" for all layers.
+        x_train: training samples.
+        y_train: training labels.
+        batch_size: batch size of training samples, must be set small enough
+          such that the GPU does not run out of memory.
+        tens: bool that determines, if the eigensolver
+          of numpy or tensorflow should be used
+          defaults to True, the tensorflow eigensolver.
+
+    Returns:
+      eigenvalues [i], eigenvectors [i,:] in decreasing order as numpy arrays.
+    """
     return eigh(hess(model, layer_str, x_train, y_train, batch_size), tens)
 
 
 def lancz_single(model, layer_pointer, number_cons, images, labels):
+    """
+    Computes the most important eigenvalues
+      and eigenvectors of a layer of a model with the Lanczos algorithm.
+
+    Args:
+        model: model.
+        layer_pointer: tensor objects that points to the parameters
+          of the model, from which one wants.
+        number_cons: number of eigenvalues to compute.
+        images: training samples.
+        labels: training labels.
+
+    Returns:
+      eigenvalues [i], eigenvectors [i,:] in decreasing order as numpy arrays.
+    """
     layer_size = np.prod(layer_pointer.shape)
 
     @tf.function
