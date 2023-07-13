@@ -204,3 +204,78 @@ def acc_components(
         test_accuracy.reset_states()
         index += 1
     return np.array([step_array, trainacc, testacc, trainloss, testloss])
+
+
+def loss_landscape(model, layer_str, vec, epsilons, x_train, y_train, x_test, y_test, batch_size=1000):
+    layer_name = []
+    b_list = []
+    if layer_str == "all":
+        for layer in model.trainable_weights:
+            if len(layer.shape) == 1:
+                b_list.append(np.array(layer))
+            if len(layer.shape) > 0:
+                layer_name.append(np.array(layer))
+    else:
+        for layer in getattr(model, layer_str).get_weights():
+            if len(layer.shape) == 1:
+                b_list.append(layer)
+            if len(layer.shape) > 1:
+                layer_name.append(layer)
+    weights_0 = flatten(layer_name)
+    layer_size = 0
+    for layer in layer_name:
+        layer_size += np.prod(layer.shape)
+    layer_lengths = []
+    for layer in layer_name:
+        layer_lengths.append(tf.math.reduce_prod(layer.shape))
+    train_ds = tf.data.Dataset.from_tensor_slices(
+        (x_train, y_train)).batch(batch_size)
+
+    if layer_str == "all":
+        def set_weights(weights):
+            templ = repack(weights, layer_name, layer_lengths)
+            k = 0
+            for i in range(len(model.layers)):
+                if len(model.layers[i].get_weights()) == 2:
+                    model.layers[i].set_weights([templ[k], templ[k+1]])
+                    k += 2
+                elif len(model.layers[i].get_weights()) == 1:
+                    model.layers[i].set_weights([templ[k]])
+                    k += 1
+    else:
+        def set_weights(weights):
+            templ = repack(weights, layer_name, layer_lengths)
+            getattr(model, layer_str).set_weights([templ[0], b_list[0]])
+
+    test_accuracy = tf.keras.metrics.SparseCategoricalAccuracy(
+        name='test_accuracy')
+    loss_object = tf.keras.losses.SparseCategoricalCrossentropy()
+    train_loss = tf.keras.metrics.Mean(name='train_loss')
+
+    @tf.function
+    def calc_acc(images, labels):
+        predictions = model(images, training=False)
+        test_accuracy(labels, predictions)
+        loss = loss_object(labels, predictions)
+        loss += sum(model.losses)
+        train_loss(loss)
+
+    trainacc = np.empty(epsilons.shape[0])
+    trainloss = np.empty(epsilons.shape[0])
+    testacc = np.empty(epsilons.shape[0])
+    index = 0
+    for epsilon in epsilons:
+        set_weights(weights_0+epsilon*vec)
+        for images, labels in train_ds:
+            calc_acc(images, labels)
+        trainacc[index] = test_accuracy.result()
+
+        trainloss[index] = train_loss.result()
+        train_loss.reset_states()
+        test_accuracy.reset_states()
+        calc_acc(x_test, y_test)
+        testacc[index] = test_accuracy.result()
+        train_loss.reset_states()
+        test_accuracy.reset_states()
+        index += 1
+    return np.array([epsilons, trainacc, trainloss, testacc])
