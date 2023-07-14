@@ -46,6 +46,13 @@ def get_weights(layer_pointer):
     return flatten(layer_pointer)
 
 
+def get_layer_lengths(layer_pointer):
+    layer_lengths = []
+    for layer in layer_pointer:
+        layer_lengths.append(tf.math.reduce_prod(layer.shape))
+    return layer_lengths
+
+
 def load_evh(model_str, layer_str):
     return np.load(model_str+'/evh_'+layer_str+'.npy')
 
@@ -101,18 +108,30 @@ def evh_weights_max(model, evh, layer_str):
     return np.argmax(np.abs(weights_prod(weights, evh)))
 
 
-def sv_field(model, model_str, layer_str, md_str="evh"):
+def sv_field(model, model_str, layer_str, md_str="evh", layer_index=-1):
     model = load_weights(model, model_str)
-    layer_pointer = get_layer_pointer(model, layer_str)[0]
-    if len(layer_pointer.shape) > 2:
-        matrix = svd_conv(layer_pointer)
+    if layer_str == 'all':
+        layer_pointer = model.layers[layer_index].kernel
+        if len(layer_pointer.shape) > 2:
+            matrix = svd_conv(layer_pointer)
+        else:
+            matrix = layer_pointer
     else:
-        matrix = layer_pointer
+        layer_pointer = get_layer_pointer(model, layer_str)[0]
+        if len(layer_pointer.shape) > 2:
+            matrix = svd_conv(layer_pointer)
+        else:
+            matrix = layer_pointer
     svv = svd(matrix)
-    if md_str == "evh":
-        evh = load_evh(model_str, layer_str)
+    if layer_str == 'all':
+        i_start = 0
+        for layer in model.trainable_variables[:layer_index]:
+            i_start += np.prod(layer.shape)
+        layer_size = np.sum(get_layer_lengths(layer_pointer))
+        evh = load_evh(model_str, "all")[i_start:i_start+layer_size]
     else:
-        evh = np.load(model_str+'/'+md_str+'_'+layer_str+'.npy')
+        evh = load_evh(model_str, layer_str)
+    evh = np.load(model_str+'/'+md_str+'_'+layer_str+'.npy')
     return np.tensordot(svv, evh, axes=(1, 1))
 
 
@@ -138,12 +157,7 @@ def acc_components(
         else:
             layer_name = [getattr(model, layer_str).kernel]
             b_list = [getattr(model, layer_str).bias]
-    layer_size = 0
-    for layer in layer_name:
-        layer_size += np.prod(layer.shape)
-    layer_lengths = []
-    for layer in layer_name:
-        layer_lengths.append(tf.math.reduce_prod(layer.shape))
+    layer_lengths = get_layer_lengths(layer_name)
     train_ds = tf.data.Dataset.from_tensor_slices(
         (x_train, y_train)).batch(batch_size)
 
@@ -222,12 +236,7 @@ def loss_landscape(model, layer_str, vec, epsilons, x_train, y_train, x_test, y_
             if len(layer.shape) > 1:
                 layer_name.append(layer)
     weights_0 = flatten(layer_name)
-    layer_size = 0
-    for layer in layer_name:
-        layer_size += np.prod(layer.shape)
-    layer_lengths = []
-    for layer in layer_name:
-        layer_lengths.append(tf.math.reduce_prod(layer.shape))
+    layer_lengths = get_layer_lengths(layer_name)
     train_ds = tf.data.Dataset.from_tensor_slices(
         (x_train, y_train)).batch(batch_size)
 
