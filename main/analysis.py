@@ -2,6 +2,7 @@ import numpy as np
 import tensorflow as tf
 from scipy import linalg
 import hess
+from scipy.special import erf
 
 
 @tf.function
@@ -288,3 +289,42 @@ def loss_landscape(model, layer_str, vec, epsilons, x_train, y_train, x_test, y_
         test_accuracy.reset_states()
         index += 1
     return np.array([epsilons, trainacc, trainloss, testacc])
+
+
+def wigner(singVal, average):
+    """def wigner( x ):
+        return np.pi*x/2*np.exp( - np.pi*x**2 /4 )
+
+    # cumulated wiegner surmise
+    def cum_wigner( x):
+        return 1- np.exp( -x*x*np.pi/4)
+
+    # cumulated distr
+    def cumulated_dist( ev ):
+        cum_distr= np.empty( len(ev) )
+        for i in range( len(ev) ):
+            cum_distr[i] = (i+1)/ len(ev)
+        return cum_distr"""
+
+    def int_unfolded_prob(array, average, x):
+        result = 0
+        for i in range(average, array.size - average):
+            # def standart deviation of gauß curve
+            std = (array[i+average] - array[i-average])/2
+            # add the impact at the x position
+            result += 0.5*(1+erf((x-array[i]) / (std * np.sqrt(2))))
+        return result
+
+    def get_surmise(singVal, average):
+        unfolded_EV = np.empty(len(singVal)-4*average)
+        # integrate the distr and normalise it
+        for i in range(2*average, len(singVal)-2*average):
+            unfolded_EV[i-2 *
+                        average] = int_unfolded_prob(singVal, average, singVal[i])
+        # eigenvalue spacing
+        spacings = np.diff(unfolded_EV)
+
+        spacings = np.sort(spacings)
+
+        return spacings
+    return get_surmise(singVal, average)
