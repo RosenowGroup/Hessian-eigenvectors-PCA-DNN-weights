@@ -328,3 +328,53 @@ def wigner(singVal, average):
 
         return spacings
     return get_surmise(singVal, average)
+
+
+def ptd(evh, number_test_s=10000, averaging_window=15):
+    evh = evh.T
+    tested_vec = evh.shape[0]
+
+    def get_cdf(N):
+        y_values = np.empty(N)
+        for i in range(N):
+            y_values[i] = (i+1)/N
+        return y_values
+
+    # draw random normalized vectors
+
+    def get_N_normalised_vec(vector_l, number_vec):
+        var = 1 / vector_l
+        matr = np.random.normal(loc=0, scale=np.sqrt(var),
+                                size=(vector_l, number_vec))
+        matr_normed = matr / np.linalg.norm(matr, axis=0)
+        return matr_normed
+
+    def get_max_diff(vector):
+
+        var = 1/len(vector[:, 0])
+
+        def cum_gauß(x):
+            return (1.0 + erf(x / np.sqrt(2.0*var))) / 2.0
+
+        length = len(vector[:, 0])
+        vector = np.sort(vector, axis=0).T
+        dist = np.abs(cum_gauß(vector) -
+                      np.array([i+1 for i in range(length)])/length)
+        return np.max(dist, axis=1)
+
+    vec = get_N_normalised_vec(vector_l=tested_vec, number_vec=number_test_s)
+    max_differences = get_max_diff(vec)
+
+    # create the test statistik
+    sorted_diff = np.sort(np.array(max_differences))
+    y_axis = get_cdf(len(sorted_diff))
+
+    def test_stat(x):
+        return np.interp(x, sorted_diff, y_axis)
+    results = 1 - test_stat(get_max_diff(evh))
+    avg_indices = range(averaging_window, np.size(results) - averaging_window)
+    p_values_avg = np.zeros(np.shape(avg_indices))
+    for i in avg_indices:
+        p_values_avg[i - averaging_window] = np.mean(
+            results[i-averaging_window:i+averaging_window])
+    return p_values_avg
