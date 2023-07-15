@@ -13,7 +13,7 @@ Given a network, the notebook computes the dynamic weight matrix of a chosen lay
 ## fcc_r.ipynb
 Definition and training of a simple 3 layer network with L2-regularization. 
 
-## pca_analysis
+## pca_analysis.ipynb
 Given a principal component basis and a network, the notebook computes the trainaccuracy and loss aswell as the test accuracy when adding these components together.
 
 ## lanczos.py
