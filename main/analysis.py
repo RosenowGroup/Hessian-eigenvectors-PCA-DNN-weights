@@ -340,7 +340,6 @@ def ptd(evh, number_test_s=10000, averaging_window=15):
             y_values[i] = (i+1)/N
         return y_values
 
-    # draw random normalized vectors
 
     def get_N_normalised_vec(vector_l, number_vec):
         var = 1 / vector_l
@@ -365,7 +364,6 @@ def ptd(evh, number_test_s=10000, averaging_window=15):
     vec = get_N_normalised_vec(vector_l=tested_vec, number_vec=number_test_s)
     max_differences = get_max_diff(vec)
 
-    # create the test statistik
     sorted_diff = np.sort(np.array(max_differences))
     y_axis = get_cdf(len(sorted_diff))
 
