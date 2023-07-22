@@ -6,7 +6,33 @@ from scipy.special import erf
 
 
 @tf.function
+def get_layer_lengths(layer_pointer_list):
+    """
+    Computes the lengths of tensors of a list.
+
+    Args:
+      layer_pointer_list:  list of tensors.
+
+    Returns:
+      List with lengths of tensors.
+    """
+    layer_lengths = []
+    for layer in layer_pointer_list:
+        layer_lengths.append(tf.math.reduce_prod(layer.shape))
+    return layer_lengths
+
+
+@tf.function
 def flatten(grad):
+    """
+    Flattens list of tensors to a vector.
+
+    Args:
+      grad:  list of tensors.
+
+    Returns:
+      Vector that contains all entries of the list.
+    """
     temp = tf.TensorArray(tf.float32, size=0,
                           dynamic_size=True, infer_shape=False)
     for gr in grad:
@@ -16,21 +42,37 @@ def flatten(grad):
 
 
 @tf.function
-def repack(weights, layer_pointer, layer_lengths):
-    weight_split = tf.split(weights, layer_lengths)
+def repack(vec, layer_pointer_list):
+    """
+    Repacks the list of tensors from a vector.
+
+    Args:
+      vec:  vector.
+      layer_pointer_list: list of tensors.
+
+    Returns:
+      List of tensors as used in TensorFlow.
+    """
+    layer_lengths = get_layer_lengths(layer_pointer_list)
+    weight_split = tf.split(vec, layer_lengths)
     templer = []
-    for layer, weights_set in zip(layer_pointer, weight_split):
+    for layer, weights_set in zip(layer_pointer_list, weight_split):
         templ = tf.reshape(weights_set, layer.shape)
         templer.append(templ)
     return templer
 
-
-def load_weights(model, model_str):
-    model.load_weights(model_str+'/saved_model/'+model_str)
-    return model
-
-
 def get_layer_pointer(model, layer_str):
+    """
+    Extract the layer pointer from a model.
+
+    Args:
+      model:  model object.
+      layer_str: str of a layer, i.e. "layers[2]" for layer 3,
+        or "all" for all layers.
+
+    Returns:
+      A layer pointer.
+    """
     layer_name = []
     if layer_str == "all":
         layer_name = model.trainable_variables
@@ -42,33 +84,74 @@ def get_layer_pointer(model, layer_str):
             layer_name = [getattr(model, layer_str).kernel]
     return layer_name
 
+def load_weights(model, model_str):
+    """
+    Loads the weights of a model.
 
-def get_weights(layer_pointer):
-    return flatten(layer_pointer)
+    Args:
+      model:  model object.
+      model_str: name of the model, s.t. its folder can be accessed.
 
-
-def get_layer_lengths(layer_pointer):
-    layer_lengths = []
-    for layer in layer_pointer:
-        layer_lengths.append(tf.math.reduce_prod(layer.shape))
-    return layer_lengths
+    Returns:
+      Model with weights loaded.
+    """
+    model.load_weights(model_str+'/saved_model/'+model_str)
+    return model
 
 
 def load_evh(model_str, layer_str):
+    """
+    Loads the Hessian eigenvectors.
+
+    Args:
+      model_str: name of the model, s.t. its folder can be accessed.
+      layer_str: name of the layer, s.t. its folder can be accessed.
+
+    Returns:
+      Numpy array of eigenvectors.
+    """
     return np.load(model_str+'/evh_'+layer_str+'.npy')
 
 
 def weights_prod(weights, evh):
+    """
+    Computes the scalar product between the weights and the eigenvectors.
+
+    Args:
+      weights: weights as an vector.
+      evh: eigenvectors.
+
+    Returns:
+      Numpy array of the weights product.
+    """
     return np.tensordot(weights/np.linalg.norm(weights), evh, axes=(0, 1))
 
 
 def svd_conv(layer_pointer):
+    """
+    Reshapes a convolutional layer to a matrix.
+
+    Args:
+      layer_pointer: Tensor or array of the convolutional layer in tensor form.
+
+    Returns:
+      Numpy array of the matrix.
+    """
     tensor = np.array(layer_pointer)
     return tensor.reshape((np.prod(tensor.shape[0:2]),
                            np.prod(tensor.shape[2:4])))
 
 
 def svd(matrix):
+    """
+    Computes the extended singular vectors.
+
+    Args:
+      matrix: Matrix where the SVD should be taken from.
+
+    Returns:
+      Extended singular vectors [i,:] in decreasing order.
+    """
     U, s, Vh = linalg.svd(matrix)
 
     def s_weights(i):
@@ -91,9 +174,29 @@ def evh_weights_prod(
         y_train=None,
         batch_size=1000,
         tens=True):
+    """
+    Computes the weights product directly from a trained model.
+
+    Args:
+      model: model object.
+      model_str: name of the model, s.t. its folder can be accessed.
+      layer_str: str of a layer, i.e. "layers[2]" for layer 3,
+        or "all" for all layers.
+      x_train: optional, training samples,
+        if given the Hessian eigenvectors are computed.
+      y_train: optional, training labels.
+      batch_size: optional, batch size
+        for the computation of Hessian eigenvectors.
+      tens: optional, bool that determines, if the eigensolver
+          of numpy or tensorflow should be used
+          defaults to True, the tensorflow eigensolver.
+
+    Returns:
+      Extended singular vectors [i,:] in decreasing order.
+    """
     model = load_weights(model, model_str)
     layer_pointer = get_layer_pointer(model, layer_str)
-    weights = get_weights(layer_pointer)
+    weights = flatten(layer_pointer)
     if np.isin(None, x_train):
         evh = load_evh(model_str, layer_str)
     else:
@@ -101,12 +204,6 @@ def evh_weights_prod(
             model, layer_str, x_train, y_train,
             batch_size=batch_size, tens=tens)
     return weights_prod(weights, evh)
-
-
-def evh_weights_max(model, evh, layer_str):
-    layer_pointer = get_layer_pointer(model, layer_str)
-    weights = get_weights(layer_pointer)
-    return np.argmax(np.abs(weights_prod(weights, evh)))
 
 
 def sv_field(model, model_str, layer_str, md_str="evh", layer_index=-1):
@@ -221,7 +318,15 @@ def acc_components(
     return np.array([step_array, trainacc, testacc, trainloss, testloss])
 
 
-def loss_landscape(model, layer_str, vec, epsilons, x_train, y_train, x_test, y_test, batch_size=1000):
+def loss_landscape(model,
+                   layer_str,
+                   vec,
+                   epsilons,
+                   x_train,
+                   y_train,
+                   x_test,
+                   y_test,
+                   batch_size=1000):
     layer_name = []
     b_list = []
     if layer_str == "all":
@@ -320,7 +425,8 @@ def wigner(singVal, average):
         # integrate the distr and normalise it
         for i in range(2*average, len(singVal)-2*average):
             unfolded_EV[i-2 *
-                        average] = int_unfolded_prob(singVal, average, singVal[i])
+                        average] = int_unfolded_prob(singVal,
+                                                     average, singVal[i])
         # eigenvalue spacing
         spacings = np.diff(unfolded_EV)
 
@@ -339,7 +445,6 @@ def ptd(evh, number_test_s=10000, averaging_window=15):
         for i in range(N):
             y_values[i] = (i+1)/N
         return y_values
-
 
     def get_N_normalised_vec(vector_l, number_vec):
         var = 1 / vector_l

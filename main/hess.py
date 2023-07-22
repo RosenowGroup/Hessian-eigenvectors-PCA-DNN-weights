@@ -15,8 +15,8 @@ def hess(model, layer_str, x_train, y_train, batch_size=1000):
         or "all" for all layers.
       x_train: training samples.
       y_train: training labels.
-      batch_size: batch size of training samples, must be set small enough
-        such that the GPU does not run out of memory.
+      batch_size: optional, batch size of training samples,
+        must be set small enough such that the GPU does not run out of memory.
 
     Returns:
       The Hessian matrix.
@@ -105,7 +105,7 @@ def eigh(hess, tens=True):
 
     Args:
       hess: Hessian matrix or matrix.
-      tens: bool that determines, if the eigensolver
+      tens: optional, bool that determines, if the eigensolver
         of numpy or tensorflow should be used
         defaults to True, the tensorflow eigensolver.
 
@@ -129,9 +129,9 @@ def comp_eig(model, layer_str, x_train, y_train, batch_size=1000, tens=True):
           or "all" for all layers.
         x_train: training samples.
         y_train: training labels.
-        batch_size: batch size of training samples, must be set small enough
+        batch_size: optional, batch size of training samples, must be set small enough
           such that the GPU does not run out of memory.
-        tens: bool that determines, if the eigensolver
+        tens: optional, bool that determines, if the eigensolver
           of numpy or tensorflow should be used
           defaults to True, the tensorflow eigensolver.
 
@@ -179,3 +179,55 @@ def lancz_single(model, layer_pointer, number_cons, images, labels):
         (layer_size, layer_size), matvec=hvp, dtype=np.float32)
     ew, ev = sparse.linalg.eigsh(linOP, number_cons)
     return ew[::-1], ev.T[::-1]
+
+
+def hess_lp(model, layer_pointer, images, labels):
+    """
+    Computes all the eigenvalues
+      and eigenvectors of a layer of a model.
+
+    Args:
+        model: model.
+        layer_pointer: tensor objects that points to the parameters
+          of the model, from which one wants.
+        images: training samples.
+        labels: training labels.
+
+    Returns:
+      eigenvalues [i], eigenvectors [i,:] in decreasing order as numpy arrays.
+    """
+    layer_dtype = np.float32
+    layer_size = np.prod(layer_pointer.shape)
+
+    @tf.function
+    def flatten(grad):
+        temp = tf.TensorArray(tf.float32, size=0,
+                              dynamic_size=True, infer_shape=False)
+        for g in grad:
+            temp = temp.write(temp.size(), tf.reshape(
+                g, (tf.math.reduce_prod(tf.shape(g)), )))
+        return temp.concat()
+
+    @tf.function
+    def hessian_calc(vector):
+        with tf.GradientTape(watch_accessed_variables=False) as tape1:
+            tape1.watch(layer_pointer)
+            with tf.GradientTape(watch_accessed_variables=False) as tape2:
+                tape2.watch(layer_pointer)
+                predictions = model(images, training=False)
+                loss = loss_object(labels, predictions)
+                loss += sum(model.losses)
+            gradient = tape2.gradient(loss, layer_pointer)
+        return tape1.gradient(gradient, layer_pointer, output_gradients=vector)
+    loss_object = tf.keras.losses.SparseCategoricalCrossentropy()
+
+    def comp_hess():
+        vector = np.zeros(layer_size, dtype=layer_dtype)
+        hess = np.zeros((layer_size, layer_size), dtype=layer_dtype)
+        for i in range(layer_size):
+            vector[i] = 1
+            hess[i] = flatten(
+                hessian_calc(tf.reshape(vector, layer_pointer.shape)))
+            vector[i] = 0
+        return hess
+    return eigh(comp_hess())
