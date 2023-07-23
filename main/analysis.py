@@ -61,6 +61,7 @@ def repack(vec, layer_pointer_list):
         templer.append(templ)
     return templer
 
+
 def get_layer_pointer(model, layer_str):
     """
     Extract the layer pointer from a model.
@@ -83,6 +84,7 @@ def get_layer_pointer(model, layer_str):
         else:
             layer_name = [getattr(model, layer_str).kernel]
     return layer_name
+
 
 def load_weights(model, model_str):
     """
@@ -207,6 +209,21 @@ def evh_weights_prod(
 
 
 def sv_field(model, model_str, layer_str, md_str="evh", layer_index=-1):
+    """
+    Computes the extended singular vector and eigenbasis field.
+
+    Args:
+      model: model object.
+      model_str: name of the model, s.t. its folder can be accessed.
+      layer_str: str of a layer for the eigenbasis
+        or "all" for all layers.
+      md_str: optional, name of the eigenbasis, defaults to "evh".
+      layer_index: required for layer_str="all",
+        index of layer of where to compute the esv.
+
+    Returns:
+      Field [i,j], where i is the esv and j the evh index in decreasing order.
+    """
     model = load_weights(model, model_str)
     if layer_str == 'all':
         layer_pointer = model.layers[layer_index].kernel
@@ -242,6 +259,24 @@ def acc_components(
         x_test,
         y_test,
         batch_size=1000):
+    """
+    Computes the accuracy when adding the eigenbasis decomposition
+      starting from the first vec in vecs.
+
+    Args:
+      model: model object.
+      layer_str: str of a layer for the eigenbasis
+        or "all" for all layers.
+      vecs: eigenbasis [i,:] is the ith vector.
+      x_train: training samples.
+      y_train: training labels.
+      x_test: test samples.
+      y_test: test labels.
+      batch_size: optional, batch size.
+
+    Returns:
+      Array [N_add,training acc, test acc, training loss, test loss].
+    """
     layer_name = []
     b_list = []
     if layer_str == "all":
@@ -327,6 +362,24 @@ def loss_landscape(model,
                    x_test,
                    y_test,
                    batch_size=1000):
+    """
+    Computes the loss landscape in direction of a given vector.
+
+    Args:
+      model: model object.
+      layer_str: str of a layer
+        or "all" for all layers.
+      vec: vector of which wants the landscape.
+      epsilons: steps in direction of the vector.
+      x_train: training samples.
+      y_train: training labels.
+      x_test: test samples.
+      y_test: test labels.
+      batch_size: optional, batch size.
+
+    Returns:
+      Array [epsilons,training acc, training loss, test acc].
+    """
     layer_name = []
     b_list = []
     if layer_str == "all":
@@ -396,11 +449,23 @@ def loss_landscape(model,
     return np.array([epsilons, trainacc, trainloss, testacc])
 
 
-def wigner(singVal, average):
+def wigner(singVal, average=15):
+    """
+    Code taken from Max Staats.
+    Wigner surmise.
+
+    Args:
+      singVal: singular values as an array.
+      average: optional, number of singular values
+        over which to average per side.
+
+    Returns:
+      Array of the unfolded surmise.
+    """
     """def wigner( x ):
         return np.pi*x/2*np.exp( - np.pi*x**2 /4 )
 
-    # cumulated wiegner surmise
+    # cumulated wigner surmise
     def cum_wigner( x):
         return 1- np.exp( -x*x*np.pi/4)
 
@@ -414,20 +479,16 @@ def wigner(singVal, average):
     def int_unfolded_prob(array, average, x):
         result = 0
         for i in range(average, array.size - average):
-            # def standart deviation of gauß curve
             std = (array[i+average] - array[i-average])/2
-            # add the impact at the x position
             result += 0.5*(1+erf((x-array[i]) / (std * np.sqrt(2))))
         return result
 
     def get_surmise(singVal, average):
         unfolded_EV = np.empty(len(singVal)-4*average)
-        # integrate the distr and normalise it
         for i in range(2*average, len(singVal)-2*average):
             unfolded_EV[i-2 *
                         average] = int_unfolded_prob(singVal,
                                                      average, singVal[i])
-        # eigenvalue spacing
         spacings = np.diff(unfolded_EV)
 
         spacings = np.sort(spacings)
@@ -437,8 +498,21 @@ def wigner(singVal, average):
 
 
 def ptd(evh, number_test_s=10000, averaging_window=15):
-    evh = evh.T
-    tested_vec = evh.shape[0]
+    """
+    Code taken from Max Staats.
+    KS-test for the Porter Thomas distribution.
+
+    Args:
+      evh: eigenvectors on which to test the statistic.
+      number_test_s: optional, number of examples
+        drawn to simulate the statistic.
+      averaging_window: optional, number of singular values
+        over which to average per side.
+
+    Returns:
+      Array of the KS-test results for all eigenvectors.
+    """
+    tested_vec = evh.T.shape[0]
 
     def get_cdf(N):
         y_values = np.empty(N)
@@ -474,7 +548,7 @@ def ptd(evh, number_test_s=10000, averaging_window=15):
 
     def test_stat(x):
         return np.interp(x, sorted_diff, y_axis)
-    results = 1 - test_stat(get_max_diff(evh))
+    results = 1 - test_stat(get_max_diff(evh.T))
     avg_indices = range(averaging_window, np.size(results) - averaging_window)
     p_values_avg = np.zeros(np.shape(avg_indices))
     for i in avg_indices:
