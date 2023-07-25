@@ -157,12 +157,12 @@ def svd(matrix):
     U, s, Vh = linalg.svd(matrix)
 
     def s_weights(i):
-        sing = np.zeros((U.shape[0], Vh.shape[0]))
+        sing = np.zeros((U.shape[0], Vh.shape[0]), dtype=np.float32)
         sing[i, i] = s[i]
         w_tilde = np.ndarray.flatten(np.matmul(U, np.matmul(sing, Vh)))
         w_tilde /= np.linalg.norm(w_tilde)
         return w_tilde
-    svv = np.zeros((s.shape[0], np.prod(matrix.shape)))
+    svv = np.zeros((s.shape[0], np.prod(matrix.shape)), dtype=np.float32)
     for i in range(s.shape[0]):
         svv[i] = s_weights(i)
     return svv
