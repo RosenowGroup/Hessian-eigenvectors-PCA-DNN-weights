@@ -206,7 +206,7 @@ def weight_measure(
                 templ = layer_name.get_weights()[0].flatten()
                 weights[index_1] = templ
                 index_1 += 1
-            print(train_loss.result())
+            print(f'Loss: {train_loss.result():.2e}')
     return model, weights
 
 

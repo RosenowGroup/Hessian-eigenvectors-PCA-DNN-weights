@@ -222,7 +222,7 @@ def sv_field(model, model_str, layer_str, md_str="evh", layer_index=-1):
         index of layer of where to compute the esv.
 
     Returns:
-      Field [i,j], where i is the esv and j the evh index in decreasing order.
+      Field [i,j], where i is the esv and j the eigenbasis index in decreasing order.
     """
     model = load_weights(model, model_str)
     if layer_str == 'all':
@@ -243,10 +243,10 @@ def sv_field(model, model_str, layer_str, md_str="evh", layer_index=-1):
         for layer in model.trainable_variables[:layer_index]:
             i_start += np.prod(layer.shape)
         layer_size = np.sum(get_layer_lengths(layer_pointer))
-        evh = load_evh(model_str, "all")[i_start:i_start+layer_size]
+        evh = np.load(model_str+'/'+md_str+'_'+layer_str +
+                      '.npy')[i_start:i_start+layer_size]
     else:
-        evh = load_evh(model_str, layer_str)
-    evh = np.load(model_str+'/'+md_str+'_'+layer_str+'.npy')
+        evh = np.load(model_str+'/'+md_str+'_'+layer_str+'.npy')
     return np.tensordot(svv, evh, axes=(1, 1))
 
 
@@ -283,14 +283,13 @@ def acc_components(
         layer_name = model.trainable_variables
     else:
         if layer_str[:6] == "layers":
-            layer_name = [getattr(model, "layers")[int(
-                layer_str[7:(len(layer_str)-1)])].kernel]
-            b_list = [getattr(model, "layers")[int(
-                layer_str[7:(len(layer_str)-1)])].bias]
+            layer_index = int(
+                layer_str[7:(len(layer_str)-1)])
+            layer_name = [getattr(model, "layers")[layer_index].kernel]
+            b_list = [getattr(model, "layers")[layer_index].bias]
         else:
             layer_name = [getattr(model, layer_str).kernel]
             b_list = [getattr(model, layer_str).bias]
-    layer_lengths = get_layer_lengths(layer_name)
     train_ds = tf.data.Dataset.from_tensor_slices(
         (x_train, y_train)).batch(batch_size)
 
@@ -299,7 +298,7 @@ def acc_components(
     theta = np.tensordot(weights_0, vecs, axes=(0, 1))
     if layer_str == "all":
         def set_weights(weights):
-            templ = repack(weights, layer_name, layer_lengths)
+            templ = repack(weights, layer_name)
             k = 0
             for i in range(len(model.layers)):
                 if len(model.layers[i].get_weights()) == 2:
@@ -310,8 +309,12 @@ def acc_components(
                     k += 1
     else:
         def set_weights(weights):
-            getattr(model, layer_str).set_weights(
-                [repack(weights, layer_name, layer_lengths)[0], b_list[0]])
+            if layer_str[:6] == "layers":
+                getattr(model, "layers")[layer_index].set_weights(
+                    [repack(weights, layer_name)[0], b_list[0]])
+            else:
+                getattr(model, layer_str).set_weights(
+                    [repack(weights, layer_name)[0], b_list[0]])
 
     # adding the principal components together up to ith indices
     def sum_weights(proj, vec):
@@ -329,7 +332,7 @@ def acc_components(
         loss += sum(model.losses)
         train_loss(loss)
     step_range = vecs.shape[0]
-    step_array = np.arane(step_range)
+    step_array = np.arange(step_range)
     testacc = np.empty(step_array.shape[0])
     trainacc = np.empty(step_array.shape[0])
     testloss = np.empty(step_array.shape[0])
@@ -389,11 +392,14 @@ def loss_landscape(model,
             if len(layer.shape) > 0:
                 layer_name.append(np.array(layer))
     else:
-        for layer in getattr(model, layer_str).get_weights():
-            if len(layer.shape) == 1:
-                b_list.append(layer)
-            if len(layer.shape) > 1:
-                layer_name.append(layer)
+        if layer_str[:6] == "layers":
+            layer_index = int(
+                layer_str[7:(len(layer_str)-1)])
+            layer_name = [getattr(model, "layers")[layer_index].kernel]
+            b_list = [getattr(model, "layers")[layer_index].bias]
+        else:
+            layer_name = [getattr(model, layer_str).kernel]
+            b_list = [getattr(model, layer_str).bias]
     weights_0 = flatten(layer_name)
     layer_lengths = get_layer_lengths(layer_name)
     train_ds = tf.data.Dataset.from_tensor_slices(
@@ -412,8 +418,12 @@ def loss_landscape(model,
                     k += 1
     else:
         def set_weights(weights):
-            templ = repack(weights, layer_name, layer_lengths)
-            getattr(model, layer_str).set_weights([templ[0], b_list[0]])
+            if layer_str[:6] == "layers":
+                getattr(model, "layers")[layer_index].set_weights(
+                    [repack(weights, layer_name)[0], b_list[0]])
+            else:
+                getattr(model, layer_str).set_weights(
+                    [repack(weights, layer_name)[0], b_list[0]])
 
     test_accuracy = tf.keras.metrics.SparseCategoricalAccuracy(
         name='test_accuracy')
