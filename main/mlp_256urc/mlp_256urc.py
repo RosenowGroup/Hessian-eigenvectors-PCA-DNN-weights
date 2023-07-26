@@ -28,9 +28,10 @@ class MyModel(tf.keras.Model):
 
 
 model = MyModel()
-model.build((32, 3072))
-
 batch_size = 32
+model.build((batch_size, 3072))
+
+
 train_ds = tf.data.Dataset.from_tensor_slices(
     (x_train, y_train)).shuffle(10000).batch(batch_size)
 test_ds = tf.data.Dataset.from_tensor_slices(
