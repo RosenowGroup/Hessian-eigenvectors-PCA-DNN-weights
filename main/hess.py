@@ -10,16 +10,16 @@ def hess(model, layer_str, x_train, y_train, batch_size=1000):
     Computes the Hessian matrix of a tensorflow model.
 
     Args:
-      model: model.
-      layer_str: str of a layer, i.e. "layers[2]" for layer 3,
-        or "all" for all layers.
-      x_train: training samples.
-      y_train: training labels.
-      batch_size: optional, batch size of training samples,
-        must be set small enough such that the GPU does not run out of memory.
+        model: model.
+        layer_str: str of a layer, i.e. "layers[2]" for layer 3,
+            or "all" for all layers.
+        x_train: training samples.
+        y_train: training labels.
+        batch_size: optional, batch size of training samples,
+            must be set small enough such that the GPU does not run out of memory.
 
     Returns:
-      The Hessian matrix.
+        The Hessian matrix.
     """
     hess_ds = tf.data.Dataset.from_tensor_slices(
         (x_train, y_train)).batch(batch_size)
@@ -38,7 +38,6 @@ def hess(model, layer_str, x_train, y_train, batch_size=1000):
     layer_size = 0
     for layer in layer_name:
         layer_size += np.prod(layer.shape)
-    # conserve the numpy datatype
     layer_dtype = np.float32
 
     @tf.function
@@ -47,7 +46,6 @@ def hess(model, layer_str, x_train, y_train, batch_size=1000):
             tape1.watch(layer_name)
             with tf.GradientTape(watch_accessed_variables=False) as tape2:
                 tape2.watch(layer_name)
-                # No trainig -> batch norm
                 predictions = model(images, training=False)
                 loss = loss_object(labels, predictions)
                 loss += sum(model.losses)
@@ -57,7 +55,6 @@ def hess(model, layer_str, x_train, y_train, batch_size=1000):
 
     @tf.function
     def repack(weights):
-        # may be improved, since it can not be compiled
         weight_split = tf.split(weights, layer_lengths)
         templer = []
         for layer, weights_set in zip(layer_name, weight_split):
@@ -104,13 +101,13 @@ def eigh(hess, tens=True):
       of the Hessian or a hermitian matrix in general.
 
     Args:
-      hess: Hessian matrix or matrix.
-      tens: optional, bool that determines, if the eigensolver
-        of numpy or tensorflow should be used
-        defaults to True, the tensorflow eigensolver.
+        hess: Hessian matrix or matrix.
+        tens: optional, bool that determines, if the eigensolver
+            of numpy or tensorflow should be used
+            defaults to True, the tensorflow eigensolver.
 
     Returns:
-      eigenvalues [i], eigenvectors [i,:] in decreasing order as numpy arrays.
+        eigenvalues [i], eigenvectors [i,:] in decreasing order as numpy arrays.
     """
     if tens:
         eigh, vech = tf.linalg.eigh(hess)
@@ -136,7 +133,7 @@ def comp_eig(model, layer_str, x_train, y_train, batch_size=1000, tens=True):
           defaults to True, the tensorflow eigensolver.
 
     Returns:
-      eigenvalues [i], eigenvectors [i,:] in decreasing order as numpy arrays.
+        eigenvalues [i], eigenvectors [i,:] in decreasing order as numpy arrays.
     """
     return eigh(hess(model, layer_str, x_train, y_train, batch_size), tens)
 
@@ -155,7 +152,7 @@ def lancz_single(model, layer_pointer, number_cons, images, labels):
         labels: training labels.
 
     Returns:
-      eigenvalues [i], eigenvectors [i,:] in decreasing order as numpy arrays.
+        eigenvalues [i], eigenvectors [i,:] in decreasing order as numpy arrays.
     """
     layer_size = np.prod(layer_pointer.shape)
 
@@ -194,7 +191,7 @@ def hess_lp(model, layer_pointer, images, labels):
         labels: training labels.
 
     Returns:
-      eigenvalues [i], eigenvectors [i,:] in decreasing order as numpy arrays.
+        eigenvalues [i], eigenvectors [i,:] in decreasing order as numpy arrays.
     """
     layer_dtype = np.float32
     layer_size = np.prod(layer_pointer.shape)

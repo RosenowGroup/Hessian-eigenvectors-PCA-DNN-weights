@@ -18,17 +18,17 @@ def train(
     Trains a tensorflow model.
 
     Args:
-      model: compiled model.
-      epochs_train: number of epochs to train.
-      lr_schedule: learning rate or schedule to train the network with.
-      x_train: training samples.
-      y_train: training labels.
-      x_test: test samples.
-      y_test: test labels.
-      batch_size: batch size.
+        model: compiled model.
+        epochs_train: number of epochs to train.
+        lr_schedule: learning rate or schedule to train the network with.
+        x_train: training samples.
+        y_train: training labels.
+        x_test: test samples.
+        y_test: test labels.
+        batch_size: batch size.
 
     Returns:
-      Trained model and history.
+        Trained model and history.
     """
     train_ds = tf.data.Dataset.from_tensor_slices(
         (x_train, y_train)).shuffle(10000).batch(batch_size)
@@ -43,7 +43,6 @@ def train(
     test_accuracy = tf.keras.metrics.SparseCategoricalAccuracy(
         name='test_accuracy')
 
-    # train function
     @tf.function
     def train_step(images, labels):
         with tf.GradientTape() as tape:
@@ -56,7 +55,6 @@ def train(
         train_loss(loss)
         train_accuracy(labels, predictions)
 
-    # test function
     @tf.function
     def test_step(images, labels):
         predictions = model(images, training=False)
@@ -66,7 +64,6 @@ def train(
         test_accuracy(labels, predictions)
     history = np.zeros((epochs_train, 4), dtype=layer_dtype)
     for epoch in range(epochs_train):
-        # Reset the metrics at the start of the next epoch
         train_loss.reset_states()
         train_accuracy.reset_states()
         test_loss.reset_states()
@@ -100,16 +97,16 @@ def comp_train(
     Trains a compiled tensorflow model.
 
     Args:
-      model: compiled model.
-      epochs_train: number of epochs to train.
-      x_train: training samples.
-      y_train: training labels.
-      x_test: test samples.
-      y_test: test labels.
-      batch_size: batch size.
+        model: compiled model.
+        epochs_train: number of epochs to train.
+        x_train: training samples.
+        y_train: training labels.
+        x_test: test samples.
+        y_test: test labels.
+        batch_size: batch size.
 
     Returns:
-      Trained model and history.
+        Trained model and history.
     """
     history = model.fit(x_train, y_train,
                         batch_size=batch_size,
@@ -132,18 +129,18 @@ def weight_measure(
     Trains a model and measure its weights.
 
     Args:
-      model: model.
-      layer_str: layer str where to compute the weights
-      epochs_train: number of epochs to train.
-      lr_schedule: learning rate or schedule to train the network with.
-      x_train: training samples.
-      y_train: training labels.
-      batch_size: batch size.
-      measure_epochs_only: wether the weights are measured
-        only once per epoch oder on every batch defaults to False.
+        model: model.
+        layer_str: layer str where to compute the weights
+        epochs_train: number of epochs to train.
+        lr_schedule: learning rate or schedule to train the network with.
+        x_train: training samples.
+        y_train: training labels.
+        batch_size: batch size.
+        measure_epochs_only: wether the weights are measured
+            only once per epoch oder on every batch defaults to False.
 
     Returns:
-      Trained model and weights.
+        Trained model and weights.
     """
     if layer_str[:6] == "layers":
         layer_name = getattr(model, "layers")[int(
@@ -227,21 +224,21 @@ def devlopement_train(
       and weights at certain epochs.
 
     Args:
-      model: model.
-      model_str: str of the model, where the Hessian
-        eigenvalues and vectors should be saved
-      layer_str: layer str where to compute the weights
-      epochs_train: number of epochs to train.
-      lr_schedule: learning rate or schedule to train the network with.
-      x_train: training samples.
-      y_train: training labels.
-      x_test: test samples.
-      y_test: test labels.
-      batch_size: batch size.
-      hess_steps: list of epochs where the Hessian should be computed.
+        model: model.
+        model_str: str of the model, where the Hessian
+            eigenvalues and vectors should be saved
+        layer_str: layer str where to compute the weights
+        epochs_train: number of epochs to train.
+        lr_schedule: learning rate or schedule to train the network with.
+        x_train: training samples.
+        y_train: training labels.
+        x_test: test samples.
+        y_test: test labels.
+        batch_size: batch size.
+        hess_steps: list of epochs where the Hessian should be computed.
 
     Returns:
-      Weights.
+        Weights.
     """
     train_ds = tf.data.Dataset.from_tensor_slices(
         (x_train, y_train)).shuffle(10000).batch(batch_size)

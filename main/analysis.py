@@ -11,10 +11,10 @@ def get_layer_lengths(layer_pointer_list):
     Computes the lengths of tensors of a list.
 
     Args:
-      layer_pointer_list:  list of tensors.
+        layer_pointer_list:  list of tensors.
 
     Returns:
-      List with lengths of tensors.
+        List with lengths of tensors.
     """
     layer_lengths = []
     for layer in layer_pointer_list:
@@ -28,10 +28,10 @@ def flatten(grad):
     Flattens list of tensors to a vector.
 
     Args:
-      grad:  list of tensors.
+        grad:  list of tensors.
 
     Returns:
-      Vector that contains all entries of the list.
+        Vector that contains all entries of the list.
     """
     temp = tf.TensorArray(tf.float32, size=0,
                           dynamic_size=True, infer_shape=False)
@@ -47,11 +47,11 @@ def repack(vec, layer_pointer_list):
     Repacks the list of tensors from a vector.
 
     Args:
-      vec:  vector.
-      layer_pointer_list: list of tensors.
+        vec:  vector.
+        layer_pointer_list: list of tensors.
 
     Returns:
-      List of tensors as used in TensorFlow.
+        List of tensors as used in TensorFlow.
     """
     layer_lengths = get_layer_lengths(layer_pointer_list)
     weight_split = tf.split(vec, layer_lengths)
@@ -67,12 +67,12 @@ def get_layer_pointer(model, layer_str):
     Extract the layer pointer from a model.
 
     Args:
-      model:  model object.
-      layer_str: str of a layer, i.e. "layers[2]" for layer 3,
-        or "all" for all layers.
+        model:  model object.
+        layer_str: str of a layer, i.e. "layers[2]" for layer 3,
+            or "all" for all layers.
 
     Returns:
-      A layer pointer.
+        A layer pointer.
     """
     layer_name = []
     if layer_str == "all":
@@ -91,11 +91,11 @@ def load_weights(model, model_str):
     Loads the weights of a model.
 
     Args:
-      model:  model object.
-      model_str: name of the model, s.t. its folder can be accessed.
+        model:  model object.
+        model_str: name of the model, s.t. its folder can be accessed.
 
     Returns:
-      Model with weights loaded.
+        Model with weights loaded.
     """
     model.load_weights(model_str+'/saved_model/'+model_str)
     return model
@@ -106,11 +106,11 @@ def load_evh(model_str, layer_str):
     Loads the Hessian eigenvectors.
 
     Args:
-      model_str: name of the model, s.t. its folder can be accessed.
-      layer_str: name of the layer, s.t. its folder can be accessed.
+        model_str: name of the model, s.t. its folder can be accessed.
+        layer_str: name of the layer, s.t. its folder can be accessed.
 
     Returns:
-      Numpy array of eigenvectors.
+        Numpy array of eigenvectors.
     """
     return np.load(model_str+'/evh_'+layer_str+'.npy')
 
@@ -120,11 +120,11 @@ def weights_prod(weights, evh):
     Computes the scalar product between the weights and the eigenvectors.
 
     Args:
-      weights: weights as an vector.
-      evh: eigenvectors.
+        weights: weights as an vector.
+        evh: eigenvectors.
 
     Returns:
-      Numpy array of the weights product.
+        Numpy array of the weights product.
     """
     return np.tensordot(weights/np.linalg.norm(weights), evh, axes=(0, 1))
 
@@ -134,10 +134,10 @@ def svd_conv(layer_pointer):
     Reshapes a convolutional layer to a matrix.
 
     Args:
-      layer_pointer: Tensor or array of the convolutional layer in tensor form.
+        layer_pointer: Tensor or array of the convolutional layer in tensor form.
 
     Returns:
-      Numpy array of the matrix.
+        Numpy array of the matrix.
     """
     tensor = np.array(layer_pointer)
     return tensor.reshape((np.prod(tensor.shape[0:2]),
@@ -149,10 +149,10 @@ def svd(matrix):
     Computes the extended singular vectors.
 
     Args:
-      matrix: Matrix where the SVD should be taken from.
+        matrix: Matrix where the SVD should be taken from.
 
     Returns:
-      Extended singular vectors [i,:] in decreasing order.
+        Extended singular vectors [i,:] in decreasing order.
     """
     U, s, Vh = linalg.svd(matrix)
 
@@ -180,21 +180,21 @@ def evh_weights_prod(
     Computes the weights product directly from a trained model.
 
     Args:
-      model: model object.
-      model_str: name of the model, s.t. its folder can be accessed.
-      layer_str: str of a layer, i.e. "layers[2]" for layer 3,
-        or "all" for all layers.
-      x_train: optional, training samples,
-        if given the Hessian eigenvectors are computed.
-      y_train: optional, training labels.
-      batch_size: optional, batch size
-        for the computation of Hessian eigenvectors.
-      tens: optional, bool that determines, if the eigensolver
-          of numpy or tensorflow should be used
-          defaults to True, the tensorflow eigensolver.
+        model: model object.
+        model_str: name of the model, s.t. its folder can be accessed.
+        layer_str: str of a layer, i.e. "layers[2]" for layer 3,
+            or "all" for all layers.
+        x_train: optional, training samples,
+            if given the Hessian eigenvectors are computed.
+        y_train: optional, training labels.
+        batch_size: optional, batch size
+            for the computation of Hessian eigenvectors.
+        tens: optional, bool that determines, if the eigensolver
+            of numpy or tensorflow should be used
+            defaults to True, the tensorflow eigensolver.
 
     Returns:
-      Extended singular vectors [i,:] in decreasing order.
+        Extended singular vectors [i,:] in decreasing order.
     """
     model = load_weights(model, model_str)
     layer_pointer = get_layer_pointer(model, layer_str)
@@ -213,16 +213,16 @@ def sv_field(model, model_str, layer_str, md_str="evh", layer_index=-1):
     Computes the extended singular vector and eigenbasis field.
 
     Args:
-      model: model object.
-      model_str: name of the model, s.t. its folder can be accessed.
-      layer_str: str of a layer for the eigenbasis
-        or "all" for all layers.
-      md_str: optional, name of the eigenbasis, defaults to "evh".
-      layer_index: required for layer_str="all",
-        index of layer of where to compute the esv.
+        model: model object.
+        model_str: name of the model, s.t. its folder can be accessed.
+        layer_str: str of a layer for the eigenbasis
+            or "all" for all layers.
+        md_str: optional, name of the eigenbasis, defaults to "evh".
+        layer_index: required for layer_str="all",
+            index of layer of where to compute the esv.
 
     Returns:
-      Field [i,j], where i is the esv and j the eigenbasis index in decreasing order.
+        Field [i,j], where i is the esv and j the eigenbasis index in decreasing order.
     """
     model = load_weights(model, model_str)
     if layer_str == 'all':
@@ -264,18 +264,18 @@ def acc_components(
       starting from the first vec in vecs.
 
     Args:
-      model: model object.
-      layer_str: str of a layer for the eigenbasis
-        or "all" for all layers.
-      vecs: eigenbasis [i,:] is the ith vector.
-      x_train: training samples.
-      y_train: training labels.
-      x_test: test samples.
-      y_test: test labels.
-      batch_size: optional, batch size.
+        model: model object.
+        layer_str: str of a layer for the eigenbasis
+            or "all" for all layers.
+        vecs: eigenbasis [i,:] is the ith vector.
+        x_train: training samples.
+        y_train: training labels.
+        x_test: test samples.
+        y_test: test labels.
+        batch_size: optional, batch size.
 
     Returns:
-      Array [N_add,training acc, test acc, training loss, test loss].
+        Array [N_add,training acc, test acc, training loss, test loss].
     """
     layer_name = []
     b_list = []
@@ -369,19 +369,19 @@ def loss_landscape(model,
     Computes the loss landscape in direction of a given vector.
 
     Args:
-      model: model object.
-      layer_str: str of a layer
-        or "all" for all layers.
-      vec: vector of which wants the landscape.
-      epsilons: steps in direction of the vector.
-      x_train: training samples.
-      y_train: training labels.
-      x_test: test samples.
-      y_test: test labels.
-      batch_size: optional, batch size.
+        model: model object.
+        layer_str: str of a layer
+            or "all" for all layers.
+        vec: vector of which wants the landscape.
+        epsilons: steps in direction of the vector.
+        x_train: training samples.
+        y_train: training labels.
+        x_test: test samples.
+        y_test: test labels.
+        batch_size: optional, batch size.
 
     Returns:
-      Array [epsilons,training acc, training loss, test acc].
+        Array [epsilons,training acc, training loss, test acc].
     """
     layer_name = []
     b_list = []
@@ -465,27 +465,13 @@ def wigner(singVal, average=15):
     Wigner surmise.
 
     Args:
-      singVal: singular values as an array.
-      average: optional, number of singular values
-        over which to average per side.
+        singVal: singular values as an array.
+        average: optional, number of singular values
+            over which to average per side.
 
     Returns:
       Array of the unfolded surmise.
     """
-    """def wigner( x ):
-        return np.pi*x/2*np.exp( - np.pi*x**2 /4 )
-
-    # cumulated wigner surmise
-    def cum_wigner( x):
-        return 1- np.exp( -x*x*np.pi/4)
-
-    # cumulated distr
-    def cumulated_dist( ev ):
-        cum_distr= np.empty( len(ev) )
-        for i in range( len(ev) ):
-            cum_distr[i] = (i+1)/ len(ev)
-        return cum_distr"""
-
     def int_unfolded_prob(array, average, x):
         result = 0
         for i in range(average, array.size - average):
@@ -513,14 +499,14 @@ def ptd(evh, number_test_s=10000, averaging_window=15):
     KS-test for the Porter Thomas distribution.
 
     Args:
-      evh: eigenvectors on which to test the statistic.
-      number_test_s: optional, number of examples
-        drawn to simulate the statistic.
-      averaging_window: optional, number of singular values
-        over which to average per side.
+        evh: eigenvectors on which to test the statistic.
+        number_test_s: optional, number of examples
+            drawn to simulate the statistic.
+        averaging_window: optional, number of singular values
+            over which to average per side.
 
     Returns:
-      Array of the KS-test results for all eigenvectors.
+        Array of the KS-test results for all eigenvectors.
     """
     tested_vec = evh.T.shape[0]
 
