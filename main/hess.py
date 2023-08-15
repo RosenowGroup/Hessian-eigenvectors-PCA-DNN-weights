@@ -5,6 +5,16 @@ import tensorflow as tf
 from scipy import sparse
 
 
+@tf.function
+def flatten(grad):
+    temp = tf.TensorArray(tf.float32, size=0,
+                          dynamic_size=True, infer_shape=False)
+    for g in grad:
+        temp = temp.write(temp.size(), tf.reshape(
+            g, (tf.math.reduce_prod(tf.shape(g)), )))
+    return temp.concat()
+
+
 def hess(model, layer_str, x_train, y_train, batch_size=1000):
     """
     Computes the Hessian matrix of a tensorflow model.
@@ -61,15 +71,6 @@ def hess(model, layer_str, x_train, y_train, batch_size=1000):
             templ = tf.reshape(weights_set, layer.shape)
             templer.append(templ)
         return templer
-
-    @tf.function
-    def flatten(grad):
-        temp = tf.TensorArray(tf.float32, size=0,
-                              dynamic_size=True, infer_shape=False)
-        for g in grad:
-            temp = temp.write(temp.size(), tf.reshape(
-                g, (tf.math.reduce_prod(tf.shape(g)), )))
-        return temp.concat()
 
     def comp_hess():
         time_stemp = time.monotonic()
@@ -138,7 +139,7 @@ def comp_eig(model, layer_str, x_train, y_train, batch_size=1000, tens=True):
     return eigh(hess(model, layer_str, x_train, y_train, batch_size), tens)
 
 
-def lancz_single(model, layer_pointer, number_cons, images, labels):
+def lancz_single(model, layer_pointer, number_cons, x_train, y_train, batch_size=1000):
     """
     Computes the most important eigenvalues
       and eigenvectors of a layer of a model with the Lanczos algorithm.
@@ -150,14 +151,19 @@ def lancz_single(model, layer_pointer, number_cons, images, labels):
         number_cons: number of eigenvalues to compute.
         images: training samples.
         labels: training labels.
+        batch_size: optional, batch size of training samples, must be set small enough
+          such that the GPU does not run out of memory.
 
     Returns:
         eigenvalues [i], eigenvectors [i,:] in decreasing order as numpy arrays.
     """
     layer_size = np.prod(layer_pointer.shape)
+    hess_ds = tf.data.Dataset.from_tensor_slices(
+        (x_train, y_train)).batch(batch_size)
+    n_batches = hess_ds.cardinality().numpy()
 
     @tf.function
-    def hessian_calc(vector):
+    def hessian_calc(images, labels, vector):
         with tf.GradientTape(watch_accessed_variables=False) as tape1:
             tape1.watch(layer_pointer)
             with tf.GradientTape(watch_accessed_variables=False) as tape2:
@@ -171,14 +177,18 @@ def lancz_single(model, layer_pointer, number_cons, images, labels):
 
     @tf.function
     def hvp(vector):
-        return hessian_calc(tf.reshape(vector, layer_pointer.shape))
+        hess = tf.zeros_like(vector)
+        for images, labels in hess_ds:
+            hess += flatten(hessian_calc(images, labels,
+                            tf.reshape(vector, layer_pointer.shape)))
+        return hess/n_batches
     linOP = sparse.linalg.LinearOperator(
         (layer_size, layer_size), matvec=hvp, dtype=np.float32)
     ew, ev = sparse.linalg.eigsh(linOP, number_cons)
     return ew[::-1], ev.T[::-1]
 
 
-def hess_lp(model, layer_pointer, images, labels):
+def hess_lp(model, layer_pointer, x_train, y_train, batch_size=1000):
     """
     Computes all the eigenvalues
       and eigenvectors of a layer of a model.
@@ -189,24 +199,19 @@ def hess_lp(model, layer_pointer, images, labels):
           of the model, from which one wants.
         images: training samples.
         labels: training labels.
+        batch_size: optional, batch size of training samples, must be set small enough
+          such that the GPU does not run out of memory.
 
     Returns:
         eigenvalues [i], eigenvectors [i,:] in decreasing order as numpy arrays.
     """
     layer_dtype = np.float32
     layer_size = np.prod(layer_pointer.shape)
+    hess_ds = tf.data.Dataset.from_tensor_slices(
+        (x_train, y_train)).batch(batch_size)
 
     @tf.function
-    def flatten(grad):
-        temp = tf.TensorArray(tf.float32, size=0,
-                              dynamic_size=True, infer_shape=False)
-        for g in grad:
-            temp = temp.write(temp.size(), tf.reshape(
-                g, (tf.math.reduce_prod(tf.shape(g)), )))
-        return temp.concat()
-
-    @tf.function
-    def hessian_calc(vector):
+    def hessian_calc(images, labels, vector):
         with tf.GradientTape(watch_accessed_variables=False) as tape1:
             tape1.watch(layer_pointer)
             with tf.GradientTape(watch_accessed_variables=False) as tape2:
@@ -223,8 +228,9 @@ def hess_lp(model, layer_pointer, images, labels):
         hess = np.zeros((layer_size, layer_size), dtype=layer_dtype)
         for i in range(layer_size):
             vector[i] = 1
-            hess[i] = flatten(
-                hessian_calc(tf.reshape(vector, layer_pointer.shape)))
+            for images, labels in hess_ds:
+                hess[i] += flatten(
+                    hessian_calc(images, labels, tf.reshape(vector, layer_pointer.shape)))
             vector[i] = 0
         return hess
     return eigh(comp_hess())
