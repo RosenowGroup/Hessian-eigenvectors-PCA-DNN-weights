@@ -9,7 +9,7 @@ def get_layer_range(model):
     Extract an array of layer indices.
 
     Args:
-        model:model.
+        model: model.
     Returns:
         Array of layer indices.
     """
@@ -84,20 +84,28 @@ def get_sv(layer_pointer, number_cons):
 
 
 def get_normed_regs(regs):
+    """
+    Norms the regularizations, such that the largest vector has a norm of one for each layer.
+
+    Args:
+        regs: List of regularizations.
+
+    Returns:
+        List of normed regularziations.
+    """
     normed_regs = []
     for reg in regs:
         normed_regs.append(reg/np.linalg.norm(reg[0]))
     return normed_regs
 
 
-def create_reg(model, layer_range, images, labels, number_cons=[2, 2],
+def create_reg(model, images, labels, number_cons=[2, 2],
                hess_only=False, batch_size=1000):
     """
     Computes regularizers for layers.
 
     Args:
         model: model where the reg should be added.
-        layer_range: iterable like a list of layers to regularize.
         images: images to compute the Hessian.
         labels: labels to compute the Hessian.
         number_cons: number of parameter to conserve, list for kernel and bias,
@@ -112,56 +120,52 @@ def create_reg(model, layer_range, images, labels, number_cons=[2, 2],
         List of regularizers in the ordering of model.layers.
     """
     regs = []
-    for i in range(len(model.layers)):
-        if len(model.layers[i].get_weights()) > 0:
-            if np.isin(i, layer_range):
-                layer_name = model.layers[i]
-                if hess_only:
-                    if number_cons[0] >= 1:
-                        number_sv = number_cons[0]
-                    else:
-                        number_sv = int(
-                            np.prod(layer_name.kernel.shape)*number_cons[0])+1
-                    temp = get_hess(model, layer_name.kernel,
-                                    number_sv, images, labels, batch_size)
+    for layer in model.trainable_variables:
+        if len(layer.shape) > 2:
+            if hess_only:
+                if number_cons[0] >= 1:
+                    number_sv = number_cons[0]
                 else:
-                    if number_cons[0] >= 1:
-                        if len(layer_name.kernel.shape) > 2:
-                            if number_cons[0] > int(np.min([np.prod(layer_name.kernel.shape[:2]), np.prod(
-                                    layer_name.kernel.shape[::-1][:2])])):
-                                number_sv = int(np.min([np.prod(layer_name.kernel.shape[:2]), np.prod(
-                                    layer_name.kernel.shape[::-1][:2])]))-1
-                            else:
-                                number_sv = number_cons[0]
+                    number_sv = int(
+                        np.prod(layer.shape)*number_cons[0])+1
+                temp = get_hess(model, layer,
+                                number_sv, images, labels, batch_size)
+            else:
+                if number_cons[0] >= 1:
+                    if len(layer.shape) > 2:
+                        if number_cons[0] > int(np.min([np.prod(layer.shape[:2]), np.prod(
+                                layer.shape[::-1][:2])])):
+                            number_sv = int(np.min([np.prod(layer.shape[:2]), np.prod(
+                                layer.shape[::-1][:2])]))-1
                         else:
-                            if number_cons[0] > int(np.min(
-                                    [layer_name.kernel.shape[0], layer_name.kernel.shape[1]])):
-                                number_sv = int(np.min(
-                                    [layer_name.kernel.shape[0], layer_name.kernel.shape[1]]))-1
-
-                            else:
-                                number_sv = number_cons[0]
+                            number_sv = number_cons[0]
                     else:
-                        if len(layer_name.kernel.shape) > 2:
-                            number_sv = int(np.min([np.prod(layer_name.kernel.shape[:2]), np.prod(
-                                layer_name.kernel.shape[::-1][:2])])*number_cons[0])+1
-                        else:
+                        if number_cons[0] > int(np.min(
+                                [layer.shape[0], layer.shape[1]])):
                             number_sv = int(np.min(
-                                [layer_name.kernel.shape[0], layer_name.kernel.shape[1]])*number_cons[0])+1
-                    temp = get_sv(layer_name.kernel, number_sv)
-                regs.append(tf.convert_to_tensor(temp))
-                if number_cons[1] != 0:
-                    if number_cons[1] >= 1:
-                        number_b = number_cons[1]
-                    else:
-                        number_b = int((layer_name.bias.shape)
-                                       [0]*number_cons[1])+1
-                    temp = get_hess(model, layer_name.bias,
-                                    number_b, images, labels, batch_size)
-                    regs.append(temp)
-                else:
-                    regs.append(0)
+                                [layer.shape[0], layer.shape[1]]))-1
 
+                        else:
+                            number_sv = number_cons[0]
+                else:
+                    if len(layer.shape) > 2:
+                        number_sv = int(np.min([np.prod(layer.shape[:2]), np.prod(
+                            layer.shape[::-1][:2])])*number_cons[0])+1
+                    else:
+                        number_sv = int(np.min(
+                            [layer.shape[0], layer.shape[1]])*number_cons[0])+1
+                temp = get_sv(layer, number_sv)
+            regs.append(tf.convert_to_tensor(temp))
+
+        else:
+            if number_cons[1] >= 1:
+                number_b = number_cons[1]
+            else:
+                number_b = int((layer.shape)
+                               [0]*number_cons[1])+1
+            temp = get_hess(model, layer,
+                            number_b, images, labels, batch_size)
+            regs.append(temp)
     return regs
 
 
