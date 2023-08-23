@@ -168,6 +168,30 @@ def svd(matrix):
     return svv
 
 
+def svdval(matrix):
+    """
+    Computes the flattend singular matrices times their singular value.
+
+    Args:
+        matrix: Matrix where the SVD should be taken from.
+
+    Returns:
+        Flattend singular matrices [i,:] in decreasing order.
+    """
+    U, s, Vh = linalg.svd(matrix)
+
+    def s_weights(i):
+        sing = np.zeros((U.shape[0], Vh.shape[0]), dtype=np.float32)
+        sing[i, i] = s[i]
+        w_tilde = np.ndarray.flatten(np.matmul(U, np.matmul(sing, Vh)))
+        w_tilde /= np.linalg.norm(w_tilde)
+        return w_tilde
+    svv = np.zeros((s.shape[0], np.prod(matrix.shape)), dtype=np.float32)
+    for i in range(s.shape[0]):
+        svv[i] = s_weights(i)*s[i]
+    return svv
+
+
 def evh_weights_prod(
         model,
         model_str,

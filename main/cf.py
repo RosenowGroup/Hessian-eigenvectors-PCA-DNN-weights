@@ -75,11 +75,11 @@ def get_sv(layer_pointer, number_cons):
     """
     if len(layer_pointer.shape) > 2:
         matrix = analysis.svd_conv(layer_pointer)
-        svec = analysis.svd(matrix)[:number_cons]
+        svec = analysis.svdval(matrix)[:number_cons]
         return svec.reshape((number_cons, *layer_pointer.shape))
     else:
         matrix = layer_pointer
-        svec = analysis.svd(matrix)[:number_cons]
+        svec = analysis.svdval(matrix)[:number_cons]
         return svec.reshape((number_cons, *layer_pointer.shape))
 
 
