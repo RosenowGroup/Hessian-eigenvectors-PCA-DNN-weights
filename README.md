@@ -1,4 +1,4 @@
-# Comparison-RMT-PCA
+# Hessian-eigenvectors-PCA-DNN-weights
 The code used to train and analyze networks for RMT and PCA in tensorflow used for my maser thesis
 
 ## main
